@@ -250,8 +250,10 @@ void main() async {
       final userId = data['userId'];
       final hallId = data['hallId'];
       final audiName = data['audiName'];
+      final bookingDate = data['bookingDate'];
+      final bookingTime = data['bookingTime'];
       final bookedSeats = List<String>.from(data['bookedSeats'] ?? []);
-      if (userId == null || hallId == null || audiName == null || bookedSeats.isEmpty) {
+      if (userId == null || hallId == null || audiName == null || bookedSeats.isEmpty||bookingTime ==null||bookingDate==null) {
         return Response(400, body: jsonEncode({'error': 'Invalid request body'}));
       }
 
@@ -274,6 +276,8 @@ void main() async {
           'hallId': hallId,
           'audiName': audiName,
           'bookedSeats': bookedSeats,
+          'bookingTime': bookingTime,
+          'bookingDate': bookingDate,
         }),
       );
 
