@@ -119,6 +119,7 @@ void main() async {
     final director = data['director'];
     final language = data['language'];
     final status = data['status'];
+    final link = data['link'];
 
     final format = List<String>.from(data['format'] ?? []);
     final genre = List<String>.from(data['genre'] ?? []);
@@ -152,6 +153,7 @@ void main() async {
       'dateTime': dateTime,
       'releaseDate': releaseDate,
       'status': status,
+      'link': link,
     };
 
     await movieCollection.insert(movie);
@@ -340,7 +342,6 @@ void main() async {
       return Response(404, body: jsonEncode({'message': 'No movies found for the given filters'}));
     }
 
-    // If filterDate is applied, extract the times for the given date
     if (filterDate != null) {
       final filteredTimes = filteredMovies.map((movie) {
         final times = movie['dateTime']
@@ -350,6 +351,7 @@ void main() async {
 
         return {
           'title': movie['title'],
+          'link': movie['link'],
           'times': times,
           'releaseDate': movie['releaseDate'],
         };
