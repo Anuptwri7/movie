@@ -33,7 +33,7 @@ void main() async {
     final dob = data['dob'];
 
     // Check if the user already exists
-    final existingUser = await usersCollection.findOne(mongo.where.eq('email', email));
+    final existingUser = await usersCollection.findOne(where.eq('email', email));
     if (existingUser != null) {
       return Response(400, body: jsonEncode({'message': 'User already exists'}));
     }
