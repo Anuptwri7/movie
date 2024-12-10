@@ -175,41 +175,64 @@ void main() async {
       if (data['capacity'] == null || int.tryParse(data['capacity'].toString()) == null) {
         return Response(400, body: jsonEncode({'error': 'Capacity must be a valid number'}));
       }
-
+      if (data['dateTime'] == null || !(data['dateTime'] is List)) {
+        return Response(400, body: jsonEncode({'error': 'DateTime cannot be null'}));
+      }
       if (data['audi'] == null || !(data['audi'] is List)) {
         return Response(400, body: jsonEncode({'error': 'Audi must be a valid list'}));
       }
 
-      // Validate Audi list
-      final audi = List<Map<String, String>>.from(
+      final dateTime = List<Map<String, String>>.from(
+        (data['dateTime'] ?? []).map((item) {
+          if (item is Map<String, dynamic>) {
+            final date = item['date']?.toString() ?? '';
+            final time = item['time']?.toString() ?? '';
+            return {'date': date, 'time': time};
+          } else {
+            throw FormatException('Invalid dateTime format');
+          }
+        }),
+      );
+
+      final audi = List<Map<String, dynamic>>.from(
         (data['audi']).map((item) {
           if (item is Map<String, dynamic>) {
             final name = item['name']?.toString()?.trim() ?? '';
             final capacity = item['capacity']?.toString()?.trim() ?? '';
-
+            final dateTime = List<Map<String, String>>.from(
+              (item['dateTime'] ?? []).map((dt) {
+                if (dt is Map<String, dynamic>) {
+                  final date = dt['date']?.toString() ?? '';
+                  final time = dt['time']?.toString() ?? '';
+                  return {'date': date, 'time': time};
+                } else {
+                  throw FormatException('Invalid dateTime format in Audi');
+                }
+              }),
+            );
             if (name.isEmpty) {
               throw FormatException('Audi name is required');
             }
-
             if (capacity.isEmpty || int.tryParse(capacity) == null) {
               throw FormatException('Audi capacity must be a valid number');
             }
-
-            return {'name': name, 'capacity': capacity};
+            return {'name': name, 'capacity': capacity, 'dateTime': dateTime};
           } else {
             throw FormatException('Invalid Audi format');
           }
         }),
       );
 
+
       final hall = {
         'name': data['name'].toString().trim(),
         'location': data['location'].toString().trim(),
         'capacity': int.parse(data['capacity'].toString()),
+        'dateTime':dateTime,
         'audi': audi,
       };
 
-      // Insert into the database
+
       await hallCollection.insert(hall);
 
       return Response(201, body: jsonEncode({'message': 'Hall created successfully'}));
@@ -344,6 +367,7 @@ void main() async {
           'name': hall['name'],
           'location': hall['location'],
           'capacity': hall['capacity'],
+          'dateTime': hall['dateTime'],
           'audi': hall['audi'],
         };
       }).toList();
