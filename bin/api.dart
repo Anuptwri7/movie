@@ -174,12 +174,7 @@ void main() async {
         return Response(400, body: jsonEncode({'error': 'Location is required'}));
       }
 
-      if (data['capacity'] == null || int.tryParse(data['capacity'].toString()) == null) {
-        return Response(400, body: jsonEncode({'error': 'Capacity must be a valid number'}));
-      }
-      if (data['dateTime'] == null || !(data['dateTime'] is List)) {
-        return Response(400, body: jsonEncode({'error': 'DateTime cannot be null'}));
-      }
+
       if (data['audi'] == null || !(data['audi'] is List)) {
         return Response(400, body: jsonEncode({'error': 'Audi must be a valid list'}));
       }
@@ -229,8 +224,7 @@ void main() async {
       final hall = {
         'name': data['name'].toString().trim(),
         'location': data['location'].toString().trim(),
-        'capacity': int.parse(data['capacity'].toString()),
-        'dateTime':dateTime,
+        'movieId':data['movieId'],
         'audi': audi,
       };
 
@@ -365,18 +359,36 @@ void main() async {
   });
   router.get('/get-halls', (Request request) async {
     try {
-
+      // Fetch all halls from the hallCollection
       final halls = await hallCollection.find().toList();
-      final response = halls.map((hall) {
+
+      // Map over the halls and fetch the movie details for each one
+      final response = await Future.wait(halls.map((hall) async {
+        // Fetch the movieId from the hall
+        final movieId = hall['movieId'];
+        Map<String, dynamic>? movieDetails;
+
+        if (movieId != null) {
+
+          movieDetails = await movieCollection.findOne(where.id(ObjectId.parse(movieId)));
+        }
+
         return {
           'id': hall['_id']?.toHexString(),
           'name': hall['name'],
           'location': hall['location'],
-          'capacity': hall['capacity'],
-          'dateTime': hall['dateTime'],
           'audi': hall['audi'],
+          'movie': movieDetails != null
+              ? {
+            'id': movieDetails['_id']?.toHexString(),
+            'title': movieDetails['title'],
+            'genre': movieDetails['genre'],
+
+          }
+              : null,
         };
-      }).toList();
+      }).toList());
+
 
       return Response.ok(
         jsonEncode({'halls': response}),
@@ -390,6 +402,7 @@ void main() async {
       );
     }
   });
+
   router.get('/users', getUsers);
 
   final handler = const Pipeline().addMiddleware(logRequests()).addHandler(router);
