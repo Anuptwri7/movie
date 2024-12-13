@@ -16,6 +16,7 @@ void main() async {
   final usersCollection = db.collection('users');
   final movieCollection = db.collection('movies');
   final hallCollection = db.collection('hall');
+  final hallWithMoviesCollection = db.collection('hall-with-movies');
 
 
   final router = Router();
@@ -120,6 +121,7 @@ void main() async {
     final language = data['language'];
     final status = data['status'];
     final link = data['link'];
+    final duration = data['duration'];
 
     final format = List<String>.from(data['format'] ?? []);
     final genre = List<String>.from(data['genre'] ?? []);
@@ -154,11 +156,92 @@ void main() async {
       'releaseDate': releaseDate,
       'status': status,
       'link': link,
+      'duration': duration,
     };
 
     await movieCollection.insert(movie);
 
     return Response(201, body: jsonEncode({'message': 'Movie created successfully'}));
+  });
+  router.post('/add-hall-with-movie', (Request request) async {
+    try {
+      final body = await request.readAsString();
+      final data = jsonDecode(body);
+
+      // Validate required fields
+      if (data['name'] == null || data['name'].toString().trim().isEmpty) {
+        return Response(400, body: jsonEncode({'error': 'Name is required'}));
+      }
+
+      if (data['location'] == null || data['location'].toString().trim().isEmpty) {
+        return Response(400, body: jsonEncode({'error': 'Location is required'}));
+      }
+
+
+      if (data['audi'] == null || !(data['audi'] is List)) {
+        return Response(400, body: jsonEncode({'error': 'Audi must be a valid list'}));
+      }
+
+      final dateTime = List<Map<String, String>>.from(
+        (data['dateTime'] ?? []).map((item) {
+          if (item is Map<String, dynamic>) {
+            final date = item['date']?.toString() ?? '';
+            final time = item['time']?.toString() ?? '';
+            return {'date': date, 'time': time};
+          } else {
+            throw FormatException('Invalid dateTime format');
+          }
+        }),
+      );
+
+      final audi = List<Map<String, dynamic>>.from(
+        (data['audi']).map((item) {
+          if (item is Map<String, dynamic>) {
+            final name = item['name']?.toString()?.trim() ?? '';
+            final capacity = item['capacity']?.toString()?.trim() ?? '';
+            final row = item['row']?.toString()?.trim() ?? '';
+            final col = item['col']?.toString()?.trim() ?? '';
+
+            final dateTime = List<Map<String, String>>.from(
+              (item['dateTime'] ?? []).map((dt) {
+                if (dt is Map<String, dynamic>) {
+                  final date = dt['date']?.toString() ?? '';
+                  final time = dt['time']?.toString() ?? '';
+                  return {'date': date, 'time': time};
+                } else {
+                  throw FormatException('Invalid dateTime format in Audi');
+                }
+              }),
+            );
+            if (name.isEmpty) {
+              throw FormatException('Audi name is required');
+            }
+            if (capacity.isEmpty || int.tryParse(capacity) == null) {
+              throw FormatException('Audi capacity must be a valid number');
+            }
+            return {'name': name, 'capacity': capacity, 'dateTime': dateTime};
+          } else {
+            throw FormatException('Invalid Audi format');
+          }
+        }),
+      );
+
+
+      final hall = {
+        'name': data['name'].toString().trim(),
+        'location': data['location'].toString().trim(),
+        'movieId':data['movieId'],
+        'audi': audi,
+      };
+
+
+      await hallWithMoviesCollection.insert(hall);
+
+      return Response(201, body: jsonEncode({'message': 'Hall created successfully'}));
+    } catch (e) {
+      // Handle validation or unexpected errors
+      return Response(400, body: jsonEncode({'error': e.toString()}));
+    }
   });
   router.post('/add-hall', (Request request) async {
     try {
@@ -196,6 +279,8 @@ void main() async {
           if (item is Map<String, dynamic>) {
             final name = item['name']?.toString()?.trim() ?? '';
             final capacity = item['capacity']?.toString()?.trim() ?? '';
+            final row = item['row']?.toString()?.trim() ?? '';
+            final col = item['col']?.toString()?.trim() ?? '';
             final dateTime = List<Map<String, String>>.from(
               (item['dateTime'] ?? []).map((dt) {
                 if (dt is Map<String, dynamic>) {
@@ -224,7 +309,6 @@ void main() async {
       final hall = {
         'name': data['name'].toString().trim(),
         'location': data['location'].toString().trim(),
-        'movieId':data['movieId'],
         'audi': audi,
       };
 
@@ -291,8 +375,6 @@ void main() async {
   });
 
 
-
-
   Future<Response> getUsers(Request request) async {
 
     await db.open();
@@ -321,18 +403,16 @@ void main() async {
       query['status'] = filterStatus;
     }
 
-
     if (filterDate != null) {
       query['dateTime'] = {
         '\$elemMatch': {'date': filterDate}
       };
     }
 
-    // Fetch movies based on the constructed query
     final filteredMovies = await movieCollection.find(query).toList();
 
     if (filteredMovies.isEmpty) {
-      // Return a 404 response if no movies are found based on the filters
+
       return Response(404, body: jsonEncode({'message': 'No movies found for the given filters'}));
     }
 
@@ -354,17 +434,22 @@ void main() async {
       return Response(200, body: jsonEncode(filteredTimes));
     }
 
-    // If no filterDate is applied, return the full movie data
-    return Response(200, body: jsonEncode(filteredMovies));
+
+    final responseMovies = filteredMovies.map((movie) {
+      movie.remove('photo');
+      return movie;
+    }).toList();
+
+    return Response(200, body: jsonEncode(responseMovies));
   });
   router.get('/get-halls', (Request request) async {
     try {
-      // Fetch all halls from the hallCollection
+
       final halls = await hallCollection.find().toList();
 
-      // Map over the halls and fetch the movie details for each one
+
       final response = await Future.wait(halls.map((hall) async {
-        // Fetch the movieId from the hall
+
         final movieId = hall['movieId'];
         Map<String, dynamic>? movieDetails;
 
@@ -402,6 +487,61 @@ void main() async {
       );
     }
   });
+  router.get('/get-halls-with-movies', (Request request) async {
+    try {
+      // Get the movieId from the query parameters
+      final queryParams = request.url.queryParameters;
+      final movieIdFilter = queryParams['movie'];
+
+      // Prepare the query to find halls
+      Map<String, dynamic> query = {};
+
+      if (movieIdFilter != null) {
+        query['movieId'] = movieIdFilter;
+      }
+
+      final halls = await hallWithMoviesCollection.find(query).toList();
+
+      final response = await Future.wait(halls.map((hall) async {
+        final movieId = hall['movieId'];
+        Map<String, dynamic>? movieDetails;
+
+        if (movieId != null) {
+          movieDetails = await movieCollection.findOne(where.id(ObjectId.parse(movieId)));
+        }
+
+        return {
+          'id': hall['_id']?.toHexString(),
+          'name': hall['name'],
+          'location': hall['location'],
+          'audi': hall['audi'],
+          'movie': movieDetails != null
+              ? {
+            'id': movieDetails['_id']?.toHexString(),
+            'title': movieDetails['title'],
+            'genre': movieDetails['genre'],
+          }
+              : {'error': 'Movie not found with this ID'},
+        };
+      }).toList());
+
+      if (response.isEmpty) {
+        return Response(404, body: jsonEncode({'message': 'No halls found for the given movie ID'}));
+      }
+
+      return Response.ok(
+        jsonEncode({'halls': response}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      // Handle errors
+      return Response.internalServerError(
+        body: jsonEncode({'error': 'Failed to fetch halls: ${e.toString()}'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  });
+
 
   router.get('/users', getUsers);
 

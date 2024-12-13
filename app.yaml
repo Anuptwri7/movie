@@ -1,0 +1,6 @@
+runtime: custom
+env: flex
+
+entrypoint: dart bin/api.dart
+
+instance_class: F2
