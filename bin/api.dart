@@ -219,7 +219,7 @@ void main() async {
             if (capacity.isEmpty || int.tryParse(capacity) == null) {
               throw FormatException('Audi capacity must be a valid number');
             }
-            return {'name': name, 'capacity': capacity, 'dateTime': dateTime};
+            return {'name': name, 'capacity': capacity, 'dateTime': dateTime, "row": row, "col": col};
           } else {
             throw FormatException('Invalid Audi format');
           }
@@ -298,7 +298,7 @@ void main() async {
             if (capacity.isEmpty || int.tryParse(capacity) == null) {
               throw FormatException('Audi capacity must be a valid number');
             }
-            return {'name': name, 'capacity': capacity, 'dateTime': dateTime};
+            return {'name': name, 'capacity': capacity, 'dateTime': dateTime, "row": row, "col": col};
           } else {
             throw FormatException('Invalid Audi format');
           }
